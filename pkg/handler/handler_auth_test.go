@@ -82,6 +82,7 @@ func TestHandler_signUp(t *testing.T) {
 	h := NewHandler(&mockService{}, slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	hand := http.HandlerFunc(h.SignUp())
 
+	
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()

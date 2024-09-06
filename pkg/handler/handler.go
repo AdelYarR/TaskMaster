@@ -27,6 +27,7 @@ func NewHandler(serv Service, log *slog.Logger) *Handler {
 	}
 }
 
+
 func (h *Handler) SignUp() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var user models.User
