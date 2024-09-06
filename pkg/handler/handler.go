@@ -31,7 +31,9 @@ func (h *Handler) SignUp() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var user models.User
 
-		err := json.NewDecoder(r.Body).Decode(&user)
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		err := decoder.Decode(&user)
 		if err != nil {
 			http.Error(w, "Failed to decode json while signing up", http.StatusBadRequest)
 			return
