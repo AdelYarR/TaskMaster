@@ -3,6 +3,7 @@ package handler
 import (
 	"TaskMaster/pkg/models"
 	"bytes"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,7 @@ import (
 
 type mockService struct {
 	signUpFunc func(models.User) (int, error)
-	signInFunc func(http.ResponseWriter, *http.Request)
+	signInFunc func(models.User) (string, error)
 	tasksFunc  func(http.ResponseWriter, *http.Request, int)
 }
 
@@ -23,13 +24,14 @@ func (m *mockService) SignUp(user models.User) (int, error) {
 	if m.signUpFunc != nil {
 		return m.signUpFunc(user)
 	}
-	return 0, nil 
+	return 0, nil
 }
 
-func (m *mockService) SignIn(w http.ResponseWriter, r *http.Request) {
+func (m *mockService) SignIn(user models.User) (string, error) {
 	if m.signInFunc != nil {
-		m.signInFunc(w, r)
+		return m.signInFunc(user)
 	}
+	return "", nil
 }
 
 func (m *mockService) Tasks(w http.ResponseWriter, r *http.Request, id int) {
@@ -46,6 +48,7 @@ func TestHandler_signUp(t *testing.T) {
 		inputUser            models.User
 		expectedStatusCode   int
 		expectedResponseBody string
+		mockServiceResponse  func() *mockService
 	}{
 		{
 			name:      "Successful sign up",
@@ -56,6 +59,11 @@ func TestHandler_signUp(t *testing.T) {
 			},
 			expectedStatusCode:   200,
 			expectedResponseBody: `{"id":0}`,
+			mockServiceResponse: func() *mockService {
+				return &mockService{signUpFunc: func(models.User) (int, error) {
+					return 0, nil
+				}}
+			},
 		},
 		{
 			name:      "Decoding error",
@@ -66,6 +74,7 @@ func TestHandler_signUp(t *testing.T) {
 			},
 			expectedStatusCode:   400,
 			expectedResponseBody: "Failed to decode json while signing up",
+			mockServiceResponse:  nil,
 		},
 		{
 			name:      "Validation error",
@@ -76,18 +85,40 @@ func TestHandler_signUp(t *testing.T) {
 			},
 			expectedStatusCode:   400,
 			expectedResponseBody: "Failed to sign up: wrong email or password",
+			mockServiceResponse:  nil,
+		},
+		{
+			name:      "Service error",
+			inputBody: `{"email":"testing@mail.ru", "password":"qwertytest"}`,
+			inputUser: models.User{
+				Email:    "testing@mail.ru",
+				Password: "qwertytest",
+			},
+			expectedStatusCode:   500,
+			expectedResponseBody: "Failed to sign up",
+			mockServiceResponse: func() *mockService {
+				return &mockService{signUpFunc: func(models.User) (int, error) {
+					return 0, fmt.Errorf("service error")
+				}}
+			},
 		},
 	}
 
-	h := NewHandler(&mockService{}, slog.New(slog.NewJSONHandler(os.Stdout, nil)))
-	hand := http.HandlerFunc(h.SignUp())
-
-	
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			req, _ := http.NewRequest(http.MethodPost, "localhost:8000/signup",
 				bytes.NewBuffer([]byte(tc.inputBody)))
+
+			var svc *mockService
+			if tc.mockServiceResponse != nil {
+				svc = tc.mockServiceResponse()
+			} else {
+				svc = &mockService{}
+			}
+
+			h := NewHandler(svc, slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+			hand := http.HandlerFunc(h.SignUp())
 			hand.ServeHTTP(rec, req)
 
 			actualBody := strings.TrimSpace(rec.Body.String())

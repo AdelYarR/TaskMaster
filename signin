@@ -1,0 +1,36 @@
+package handler
+
+import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestHandler_signIn(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		inputBody            string
+		expectedStatusCode   int
+		expectedResponseBody string
+	}{{
+		name:                 "Decoding error",
+		inputBody:            `{"testerror":"test", "testerror":"test"}`,
+		expectedStatusCode:   400,
+		expectedResponseBody: "Failed to decode json while singning in",
+	},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodPost, "localhost:8000/signup",
+				bytes.NewBuffer([]byte(tc.inputBody)))
+
+			assert.Equal(t, tc.expectedStatusCode, rec.Code, "Status codes should match")
+			assert.Equal(t, tc.expectedResponseBody, rec.Body, "Body values should match")
+		})
+	}
+}

@@ -8,7 +8,6 @@ type User struct {
 }
 
 type Task struct {
-	TaskID      int       `json:"task_id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Status      string    `json:"status"`

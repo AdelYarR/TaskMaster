@@ -11,7 +11,7 @@ import (
 
 type Service interface {
 	SignUp(models.User) (int, error)
-	SignIn(http.ResponseWriter, *http.Request)
+	SignIn(models.User) (string, error)
 	Tasks(http.ResponseWriter, *http.Request, int)
 }
 
@@ -26,7 +26,6 @@ func NewHandler(serv Service, log *slog.Logger) *Handler {
 		logger:  log,
 	}
 }
-
 
 func (h *Handler) SignUp() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +59,32 @@ func (h *Handler) SignUp() http.HandlerFunc {
 
 func (h *Handler) SignIn() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		h.service.SignIn(w, r)
+		var user models.User
+
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		err := decoder.Decode(&user)
+		if err != nil {
+			http.Error(w, "Failed to decode json while singning in", http.StatusBadRequest)
+			return
+		}
+
+		token, err := h.service.SignIn(user)
+		if err != nil {
+			switch err.Error() {
+			case "IncorrectEmail":
+				http.Error(w, "Failed to sign in: incorrect email", http.StatusBadRequest)
+			case "IncorrectPassword":
+				http.Error(w, "Failed to sign in: incorrect password", http.StatusBadRequest)
+			default:
+				http.Error(w, "Failed to create JWT Token", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{"JWT Token": token})
 	}
 }
 

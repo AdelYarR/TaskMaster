@@ -1,8 +1,8 @@
 package service
 
-import (
-	"TaskMaster/pkg/models"
+import ("TaskMaster/pkg/models"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,10 +12,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+//go:generate mockgen -source=service.go -destination=mocks/mock.go
+
 type PGRepo interface {
 	SignUp(string, string) (int, error)
 	SignIn(string) (int, string, error)
 	GetTasks(int) ([]models.Task, error)
+	AddTask(models.Task, int) (error)
 }
 
 type Service struct {
@@ -52,30 +55,31 @@ func (s *Service) SignUp(user models.User) (int, error) {
 	return id, nil
 }
 
-func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
-	var user models.User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		s.logger.Error("Failed to decode json while signing in")
-	}
+func (s *Service) SignIn(user models.User) (string, error) {
 
 	user_id, hash, err := s.repository.SignIn(user.Email)
 	if err != nil {
-		w.Write([]byte("Email is incorrect"))
-		s.logger.Error("Failed to sign in")
+		s.logger.Error("Failed to sign in: email is incorrect")
+		return "", errors.New("IncorrectEmail")
 	}
 
 	if !s.CheckPasswordHash(hash, user.Password) {
-		w.Write([]byte("Password is incorrect"))
-		return
+		s.logger.Error("Failed to sign in: password is incorrect")
+		return "", errors.New("IncorrectPassword")
 	}
 
 	token, err := s.CreateJWTToken(user_id)
 	if err != nil {
 		s.logger.Error("Failed to create token")
+		return "", err
 	}
 
-	fmt.Fprintf(w, "Signing in has been done successfully. JWT Token: %s\n", token)
+	s.logger.Info(
+		"Signing in has been done successfully",
+		"JWT Token: ", token,
+	)
+
+	return token, nil
 }
 
 func (s *Service) Tasks(w http.ResponseWriter, r *http.Request, userID int) {
@@ -91,6 +95,22 @@ func (s *Service) Tasks(w http.ResponseWriter, r *http.Request, userID int) {
 			fmt.Fprintf(w, "Failed to encode while getting tasks: %v", err)
 			return
 		}
+	case http.MethodPost:
+		var task models.Task
+
+		err := json.NewDecoder(r.Body).Decode(&task)
+		if err != nil {
+			fmt.Fprintf(w, "Failed to encode while getting tasks: %v", err)
+			return
+		}
+		
+		err = s.repository.AddTask(task, userID)
+		if err != nil {
+			s.logger.Error("Failed to add new task")
+			return
+		}
+
+		fmt.Fprintf(w, "Successfully added new task.")
 	}
 }
 
