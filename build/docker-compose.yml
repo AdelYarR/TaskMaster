@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+
+  taskmaster:
+    build: 
+      context: ..
+      dockerfile: build/Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_DB: taskuser
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rootroot
+    ports:
+      - "5432:5432"

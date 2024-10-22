@@ -1,5 +1,5 @@
-bindaddr: localhost:8000
+bindaddr: 0.0.0.0:8000
 store:
-  db_url: postgres://postgres:rootroot@localhost:5432/taskuser?sslmode=disable
+  db_url: postgres://postgres:rootroot@host.docker.internal:5432/taskuser?sslmode=disable
 
   
